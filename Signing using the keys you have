@@ -1,0 +1,31 @@
+# Identify Required Certificate Files:
+Private Key → _.afmsagaftrafund.org.private.key
+Certificate (Public Key) → certificate.crt
+Intermediate CA (if needed) → gd-g2_iis_intermediates.p7b
+Another Certificate File → ec4c331dee580282.crt
+
+# Convert .p7b to .pem if needed: 
+openssl pkcs7 -print_certs -in gd-g2_iis_intermediates.p7b -out intermediate.pem
+
+# Convert Certificates to a Format Usable by Cosign:
+openssl rsa -in _.afmsagaftrafund.org.private.key -out private.pem
+
+# Ensure the certificate and key match:
+openssl x509 -noout -modulus -in certificate.crt | openssl md5
+openssl rsa -noout -modulus -in private.pem | openssl md5
+
+If both hashes match, they are a valid pair.
+
+# Sign the Docker Image:
+(a) Build the Image
+docker build -t myregistry.azurecr.io/my-app:v1 .
+
+(b) Push the Image to Azure Container Registry (ACR)
+az acr login --name myregistry
+docker push myregistry.azurecr.io/my-app:v1
+
+(c) Sign with External Certificate
+cosign sign --key private.pem --cert certificate.crt --cert-chain intermediate.pem myregistry.azurecr.io/my-app:v1
+
+4️⃣ Verify the Image Signature
+cosign verify --cert certificate.crt --cert-chain intermediate.pem myregistry.azurecr.io/my-app:v1
